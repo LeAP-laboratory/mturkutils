@@ -29,6 +29,8 @@ from csv import DictReader
 import argparse
 from dateutil.parser import parse
 import numpy as np
+from scipy.stats import gaussian_kde
+from scipy.stats import bayes_mvs
 
 HOUR = 3600
 
@@ -50,22 +52,35 @@ def submit_time_histogram(arr):
     from math import ceil, log
     try:
         import matplotlib.mlab as mlab
-        import matplotlib.pyplot as plt
+        from prettyplotlib import plt
     except ImportError:
-        print('You must have Matplotlib installed to plot a histogram.')
+        print('You must have Matplotlib and Prettyplotlib installed to plot a histogram.')
 
     # Use Sturges' formula for number of bins: k = ceiling(log2 n + 1)
     k = ceil(log(len(arr), 2) + 1)
     n, bins, patches = plt.hist(arr, k, normed=1, facecolor='green', alpha=0.75)
     # throw a PDF plot on top of it
-    y = mlab.normpdf(bins, np.mean(arr), np.std(arr))
-    l = plt.plot(bins, y, 'r--', linewidth=1)
+    #y = mlab.normpdf(bins, np.mean(arr), np.std(arr))
+    #l = plt.plot(bins, y, 'r--', linewidth=1)
+
+    # Get a Bayesian confidence interval for mean, variance, standard deviation
+    dmean, dvar, dsd = bayes_mvs(deltas)
 
     # drop a line in at the mean for fun
-    plt.axvline(np.mean(arr), color='blue', alpha=0.5)
+    plt.axvline(dmean[0], color='blue', alpha=0.5)
+    plt.axvspan(dmean[1][0], dmean[1][1], color='blue', alpha=0.5)
+    plt.axvline(np.median(deltas), color='y', alpha=0.5)
+
+    # Caclulate a Kernel Density Estimate
+    density = gaussian_kde(deltas)
+    xs = np.arange(0., np.max(deltas), 0.1) 
+    density.covariance_factor = lambda : .25
+    density._compute_covariance()
+    plt.plot(xs,density(xs), color='m')
 
     #FIXME: come up with better legend names
-    plt.legend(('Normal Curve', 'Mean'))
+    #plt.legend(('Normal Curve', 'Mean', 'Median', 'KDE'))
+    plt.legend(('Mean', 'Median', 'KDE'))
 
     plt.xlabel('Submit Times (in Seconds)')
     plt.ylabel('Probability')
@@ -78,19 +93,20 @@ parser = argparse.ArgumentParser(description='Calculate the min, max, mean, and'
                                               'median time workers took to do a'
                                               'particular HIT and what the'
                                               'corresponding hourly rates are')
-parser.add_argument('-resultsfile', required=True, help='(required) Results file to use')
-parser.add_argument('-pay', type=float, required=True, help='Pay per HIT')
-parser.add_argument('-removeoutliers', required=False, action="store_true",
+parser.add_argument('-r', '--resultsfiles', nargs='*', required=True, help='(required) Results file to use')
+parser.add_argument('-p', '--pay', type=float, required=True, help='Pay per HIT')
+parser.add_argument('-o', '--removeoutliers', required=False, action="store_true",
                     default=False, help='Remove outlier values?')
-parser.add_argument('-removerejected', required=False, action="store_true",
+parser.add_argument('-j', '--removerejected', required=False, action="store_true",
                     default=False, help='Remove rejected workers?')
-parser.add_argument('-plot', required=False, action="store_true",
+parser.add_argument('-t', '--plot', required=False, action="store_true",
                     default=False, help='Plot a histogram of submit times')
 args = parser.parse_args()
 
 results = []
-with open(args.resultsfile, 'r') as resfile:
-    results = list(DictReader(resfile, delimiter='\t'))
+for r in args.resultsfiles:
+    with open(r, 'r') as resfile:
+        results = list(DictReader(resfile, delimiter='\t'))
 
 if args.removerejected:
     print("Workers before filtering rejected: {}".format(len(results)))
@@ -108,13 +124,19 @@ if args.removeoutliers:
     print("Workers after filtering outliers: {}".format(len(deltas)))
 
 minsubmit = np.min(deltas)
-print("\nFastest time: {} seconds".format(minsubmit))
-meansubmit = np.mean(deltas)
-print("Mean time: {} seconds".format(meansubmit))
-medsubmit = np.median(deltas)
-print("Median time: {} seconds".format(medsubmit))
+print("\nFastest time: {:.2f} seconds ({:.2f} minutes)".format(minsubmit, minsubmit / 60))
 maxsubmit = np.max(deltas)
-print("Slowest time: {} seconds".format(maxsubmit))
+print("Slowest time: {:.2f} seconds ({:.2f} minutes)".format(maxsubmit, maxsubmit / 60))
+medsubmit = np.median(deltas)
+print("Median time: {:.2f} seconds ({:.2f} minutes)".format(medsubmit, medsubmit / 60))
+meansubmit = np.mean(deltas)
+print("Mean time: {:.2f} seconds ({:.2f} minutes)".format(meansubmit, meansubmit / 60))
+stdsubmit = np.std(deltas)
+print("Standard deviation: {:.2f} seconds ({:.2f} minutes)".format(stdsubmit, stdsubmit / 60))
+twostd = stdsubmit * 2
+lowsub = meansubmit - twostd
+highsub = meansubmit + twostd
+print("98% of workers should be between {:.2f} seconds ({:.2f} minutes) and {:.2f} seconds ({:.2f} minutes)".format(lowsub, lowsub / 60, highsub, highsub / 60))
 
 minpay = (HOUR / maxsubmit) * args.pay
 print("\nMinimum hourly pay: ${:.2f}".format(minpay))
