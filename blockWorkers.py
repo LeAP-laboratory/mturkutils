@@ -27,9 +27,11 @@ from os.path import expanduser
 
 parser = argparse.ArgumentParser(description='Block a worker from doing your HITs on Amazon Mechanical Turk')
 parser.add_argument('-blockfile', required=True, help="(required) File with comma separated 'worker' and 'reason' columns")
+parser.add_argument('-p', '--profile',
+        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
-mtc = MTurkConnection(is_secure=True)
+mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
 
 with open(args.blockfile, 'r') as blockfile:
     toblock = DictReader(blockfile)

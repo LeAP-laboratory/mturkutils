@@ -21,10 +21,16 @@
 
 from __future__ import print_function, division
 from boto.mturk.connection import MTurkConnection
+import argparse
 
 #TODO: make a sandbox option
 
-mtc = MTurkConnection(is_secure=True)
+parser = argparse.ArgumentParser(description='Get all HITs for an account.')
+parser.add_argument('-p', '--profile',
+        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
+args = parser.parse_args()
+
+mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
 
 all_hits = mtc.get_all_hits()
 

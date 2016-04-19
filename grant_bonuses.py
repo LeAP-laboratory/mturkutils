@@ -32,10 +32,12 @@ from boto.exception import AWSConnectionError, EC2ResponseError
 
 parser = argparse.ArgumentParser(description='Grant bonuses for HITs on Amazon Mechanical Turk')
 parser.add_argument('-experiment', required=True, help='(required) The name of the experiment you are granting bonuses for')
+parser.add_argument('-p', '--profile',
+        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
 try:
-    conn = MTurkConnection(is_secure=True)
+    conn = MTurkConnection(is_secure=True, profile_name=args.profile)
     mtbal = conn.get_account_balance()
     if len(mtbal) == 1:
         print "Available balance: ", mtbal[0]

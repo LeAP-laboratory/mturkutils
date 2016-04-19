@@ -37,6 +37,8 @@ parser = argparse.ArgumentParser(description='Approve work from Amazon Mechanica
 parser.add_argument('-r', '--resultsfile', required=True, help='Filename for tab delimited CSV file')
 parser.add_argument('-s', '--sandbox', action='store_true',
                     help='Run the command in the Mechanical Turk Sandbox (used for testing purposes)')
+parser.add_argument('-p', '--profile',
+        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
 if args.sandbox:
@@ -47,7 +49,7 @@ if args.sandbox:
 
 results = pd.read_csv(args.resultsfile, sep='\t')
 
-mtc = MTurkConnection(is_secure=True)
+mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
 
 # TODO: check 'assignmentstatus' and only approve those that are 'Submitted'
 # Also, to copy behavior of Java tools, reject any that have an 'x' in the

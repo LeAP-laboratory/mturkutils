@@ -128,6 +128,8 @@ parser.add_argument('-f', '--successfile', required=True, help='YAML file with H
 parser.add_argument('-r', '--resultsfile', required=True, help='Filename for tab delimited CSV file')
 parser.add_argument('-s', '--sandbox', action='store_true',
                     help='Run the command in the Mechanical Turk Sandbox (used for testing purposes)')
+parser.add_argument('-p', '--profile',
+        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
 if args.sandbox:
@@ -139,7 +141,7 @@ if args.sandbox:
 with open(args.successfile, 'r') as successfile:
     hitdata = load(successfile, Loader=Loader)
 
-mtc = MTurkConnection(is_secure=True)
+mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
 
 all_results = []
 outkeys = ['hitid', 'hittypeid', 'title', 'description', 'keywords', 'reward',
