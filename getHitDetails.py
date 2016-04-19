@@ -32,6 +32,8 @@ from os.path import expanduser
 parser = argparse.ArgumentParser(description='Get information about a HIT from Amazon Mechanical Turk')
 parser.add_argument('-successfile', required=True, help='(required) The file to which you\'d like your results saved')
 parser.add_argument('-sandbox', type=bool, default=False, help='Run the command in the Mechanical Turk Sandbox (used for testing purposes) NOT IMPLEMENTED')
+parser.add_argument('-p', '--profile',
+        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
 if args.sandbox:
@@ -41,7 +43,7 @@ hitids = None
 with open(expanduser(args.successfile), 'r') as successfile:
     hitids = [row['hitid'] for row in DictReader(successfile, delimiter='\t')]
 
-mtc = MTurkConnection(is_secure=True)
+mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
 
 # To get any information about status, you have to get the HIT via get_all_hits
 # If you just use get_hit() it gets minimal info
