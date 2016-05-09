@@ -141,7 +141,7 @@ outfilename = hitfile_name.split('.')
 outfilename.insert(-1, 'success')
 outfilename = '.'.join(outfilename)
 with open(outfilename, 'w') as successfile:
-    safe_dump([dict((('HITId', x.HITId), ('HITTypeId', x.HITTypeId))) for x in created_hit],
+    safe_dump([{'HITId': x.HITId, 'HITTypeId': x.HITTypeId} for x in created_hit],
               stream=successfile, default_flow_style=False)
 
 

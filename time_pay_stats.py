@@ -73,7 +73,7 @@ def submit_time_histogram(arr):
 
     # Caclulate a Kernel Density Estimate
     density = gaussian_kde(deltas)
-    xs = np.arange(0., np.max(deltas), 0.1) 
+    xs = np.arange(0., np.max(deltas), 0.1)
     density.covariance_factor = lambda : .25
     density._compute_covariance()
     plt.plot(xs,density(xs), color='m')
@@ -106,7 +106,7 @@ args = parser.parse_args()
 results = []
 for r in args.resultsfiles:
     with open(r, 'r') as resfile:
-        results = list(DictReader(resfile, delimiter='\t'))
+        results.extend(list(DictReader(resfile, delimiter='\t')))
 
 if args.removerejected:
     print("Workers before filtering rejected: {}".format(len(results)))

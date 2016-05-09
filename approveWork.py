@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2014, Andrew Watts and
+# Copyright (c) 2014-2016, Andrew Watts and
 #        the University of Rochester BCS Department
 # All rights reserved.
 #
@@ -31,7 +31,7 @@ import pandas as pd
 from boto.mturk.connection import MTurkConnection
 from boto import config
 
-__author__ = 'Andrew Watts <awatts@bcs.rochester.edu>'
+__author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
 parser = argparse.ArgumentParser(description='Approve work from Amazon Mechanical Turk')
 parser.add_argument('-r', '--resultsfile', required=True, help='Filename for tab delimited CSV file')
@@ -49,11 +49,12 @@ if args.sandbox:
 
 results = pd.read_csv(args.resultsfile, sep='\t')
 
+needapproval = results[results['assignmentstatus'] == 'Submitted']
+
 mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
 
-# TODO: check 'assignmentstatus' and only approve those that are 'Submitted'
-# Also, to copy behavior of Java tools, reject any that have an 'x' in the
+# TODO: to copy behavior of Java tools, reject any that have an 'x' in the
 # 'reject' column and send feedback based on value of 'feedback' column
-for a in list(results['assignmentid']):
+for a in list(needapproval['assignmentid']):
     print("Approving {}".format(a))
     mtc.approve_assignment(a)
