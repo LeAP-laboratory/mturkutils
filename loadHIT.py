@@ -82,8 +82,12 @@ if abort:
     sys.exit()
 
 reward = Price(hitdata['reward'])
-
-question = ExternalQuestion(hitdata['question']['url'], hitdata['question']['height'])
+if 'input' in hitdata['question']:
+    qurls = [hitdata['question']['url'].format(**row) for row in hitdata['question']['input']]
+else:
+     qurls = [hitdata['question']['url']]
+ 
+questions = [ExternalQuestion(url, hitdata['question']['height']) for url in qurls]
 
 quals = Qualifications()
 
@@ -126,27 +130,33 @@ approvaldelay = timedelta(days=14)
 if 'autoapprovaldelay' in hitdata:
     approvaldelay = timedelta(seconds=hitdata['autoapprovaldelay'])
 
-created_hit = mtc.create_hit(question=question,
-                             max_assignments=hitdata['assignments'],
-                             title=hitdata['title'],
-                             description=hitdata['description'],
-                             keywords=hitdata['keywords'],
-                             duration=duration,
-                             lifetime=lifetime,
-                             approval_delay=approvaldelay,
-                             reward=reward,
-                             qualifications=quals)
+created_hits = [(q, hitdata['assignments'],hitdata['title'], hitdata['description'], hitdata['keywords'])]
+created_hits = [mtc.create_hit(question=q,
+                              max_assignments=hitdata['assignments'],
+                              title=hitdata['title'],
+                              description=hitdata['description'],
+                              keywords=hitdata['keywords'],
+                              duration=duration,
+                              lifetime=lifetime,
+                              approval_delay=approvaldelay,
+                              reward=reward,
+                              qualifications=quals)
+                 for q in questions]
+     
+hit_list = [dict((('HITId', y.HITId), ('HITTypeId', y.HITTypeId))) for y in [x[0] for x in created_hits]]
 
 outfilename = hitfile_name.split('.')
 outfilename.insert(-1, 'success')
 outfilename = '.'.join(outfilename)
 with open(outfilename, 'w') as successfile:
-    safe_dump([{'HITId': x.HITId, 'HITTypeId': x.HITTypeId} for x in created_hit],
-              stream=successfile, default_flow_style=False)
+    safe_dump(hit_list, stream=successfile, default_flow_style=False)
+
 
 
 preview_url = "https://www.mturk.com/mturk/preview?groupId={}"
 if args.sandbox:
     preview_url = "https://workersandbox.mturk.com/mturk/preview?groupId={}"
 
-print("You can preview your new HIT at:\n\t{}".format(preview_url.format(created_hit[0].HITTypeId)))
+for hittypeid in set((x['HITTypeId'] for x in hit_list)):
+    print("You can preview your new HIT at:\n\t{}".format(preview_url.format(hittypeid)))
+    print("{0} is the final balance".format(mtc.get_account_balance()))
