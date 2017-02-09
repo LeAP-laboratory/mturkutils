@@ -131,7 +131,6 @@ approvaldelay = timedelta(days=14)
 if 'autoapprovaldelay' in hitdata:
     approvaldelay = timedelta(seconds=hitdata['autoapprovaldelay'])
 
-# FIXME: if mtc.create_hit fails partway through a list of HITs to create, they all get lost
 created_hits = []
 for q in questions:
     try:
