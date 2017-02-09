@@ -11,3 +11,7 @@ or /etc/boto.cfg or ~/.boto files:
     aws_secret_access_key = <your secret key>
 
 See [boto configuration](http://boto3.readthedocs.org/en/latest/guide/configuration.html) for how to set up credential files.
+
+## External Dependencies
+ * [unicodecsv](https://pypi.python.org/pypi/unicodecsv)
+ * [PyYAML](https://pypi.python.org/pypi/PyYAML)

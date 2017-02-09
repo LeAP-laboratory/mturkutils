@@ -33,7 +33,7 @@ __author__ = 'Andrew Watts <awatts@bcs.rochester.edu>'
 from math import ceil
 import argparse
 import sys
-from csv import DictWriter
+from unicodecsv import DictWriter
 from boto.mturk.connection import MTurkConnection
 from boto import config
 
