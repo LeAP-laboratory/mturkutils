@@ -25,24 +25,27 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+"""Load HITs to Mechanical Turk."""
+
 from __future__ import print_function
 
 import argparse
 from datetime import timedelta
+
 from boto.mturk.connection import MTurkConnection
 from boto.mturk.price import Price
-from boto.mturk.question import ExternalQuestion
-from boto import config
-from boto.mturk.qualification import (Requirement,
+
+from boto.mturk.qualification import (AdultRequirement,
+                                      LocaleRequirement,
                                       NumberHitsApprovedRequirement,
+                                      PercentAssignmentsAbandonedRequirement,
                                       PercentAssignmentsApprovedRequirement,
                                       PercentAssignmentsRejectedRequirement,
                                       PercentAssignmentsReturnedRequirement,
                                       PercentAssignmentsSubmittedRequirement,
-                                      PercentAssignmentsAbandonedRequirement,
-                                      LocaleRequirement,
-                                      AdultRequirement,
-                                      Qualifications)
+                                      Qualifications,
+                                      Requirement)
+from boto.mturk.question import ExternalQuestion
 
 from yaml import load, safe_dump
 try:
@@ -56,14 +59,10 @@ parser = argparse.ArgumentParser(description='Load a HIT into Amazon Mechanical 
 parser.add_argument('-c', '--config', required=True, help='YAML file with HIT configuration')
 parser.add_argument('-s', '--sandbox', action='store_true',
                     help='Run the command in the Mechanical Turk Sandbox (used for testing purposes)')
-parser.add_argument('-p', '--profile',
-        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
+parser.add_argument('-p', '--profile', help='Run commands using specific aws credentials rather the default.'
+                                            'To set-up alternative credentials see '
+                                            'http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
-
-if args.sandbox:
-    if not config.has_section('MTurk'):
-        config.add_section('MTurk')
-    config.set('MTurk', 'sandbox', 'True')
 
 with open(args.config, 'r') as hitfile:
     hitfile_name = hitfile.name
@@ -85,15 +84,15 @@ reward = Price(hitdata['reward'])
 if 'input' in hitdata['question']:
     qurls = [hitdata['question']['url'].format(**row) for row in hitdata['question']['input']]
 else:
-     qurls = [hitdata['question']['url']]
- 
+    qurls = [hitdata['question']['url']]
+
 questions = [ExternalQuestion(url, hitdata['question']['height']) for url in qurls]
 
 quals = Qualifications()
 
 for b in hitdata['qualifications']['builtin']:
     if b['qualification'] == 'AdultRequirement':
-        assert b['value'] in (0, 1), "value must be 0 or 1, not {}".format(b['value'])
+        assert b['value'] in (0, 1), 'value must be 0 or 1, not {}'.format(b['value'])
         q = AdultRequirement(b['comparator'], b['value'], b['private'])
     elif b['qualification'] == 'LocaleRequirement':
         q = LocaleRequirement(b['comparator'], b['locale'], b['private'])
@@ -117,7 +116,8 @@ if 'custom' in hitdata['qualifications']:
         q = Requirement(c['qualification'], c['comparator'], **optional)
         quals.add(q)
 
-mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
+host = 'mechanicalturk.sandbox.amazonaws.com' if args.sandbox else 'mechanicalturk.amazonaws.com'
+mtc = MTurkConnection(is_secure=True, profile_name=args.profile, host=host)
 
 # Time defaults in boto are WAY too long
 duration = timedelta(minutes=60)
@@ -130,20 +130,23 @@ approvaldelay = timedelta(days=14)
 if 'autoapprovaldelay' in hitdata:
     approvaldelay = timedelta(seconds=hitdata['autoapprovaldelay'])
 
-created_hits = [(q, hitdata['assignments'],hitdata['title'], hitdata['description'], hitdata['keywords'])]
+# XXX: I think this is just old code that assumes one question. Can it be removed?
+# created_hits = [(q, hitdata['assignments'],hitdata['title'], hitdata['description'], hitdata['keywords'])]
+
+# FIXME: if mtc.create_hit fails partway through a list of HITs to create, they all get lost
 created_hits = [mtc.create_hit(question=q,
-                              max_assignments=hitdata['assignments'],
-                              title=hitdata['title'],
-                              description=hitdata['description'],
-                              keywords=hitdata['keywords'],
-                              duration=duration,
-                              lifetime=lifetime,
-                              approval_delay=approvaldelay,
-                              reward=reward,
-                              qualifications=quals)
-                 for q in questions]
-     
-hit_list = [dict((('HITId', y.HITId), ('HITTypeId', y.HITTypeId))) for y in [x[0] for x in created_hits]]
+                               max_assignments=hitdata['assignments'],
+                               title=hitdata['title'],
+                               description=hitdata['description'],
+                               keywords=hitdata['keywords'],
+                               duration=duration,
+                               lifetime=lifetime,
+                               approval_delay=approvaldelay,
+                               reward=reward,
+                               qualifications=quals)
+                for q in questions]
+
+hit_list = [{'HITId': y.HITId, 'HITTypeId': y.HITTypeId} for y in [x[0] for x in created_hits]]
 
 outfilename = hitfile_name.split('.')
 outfilename.insert(-1, 'success')
@@ -151,12 +154,8 @@ outfilename = '.'.join(outfilename)
 with open(outfilename, 'w') as successfile:
     safe_dump(hit_list, stream=successfile, default_flow_style=False)
 
+preview_url = 'https://workersandbox.mturk.com/mturk/preview?groupId={}' if args.sandbox else 'https://www.mturk.com/mturk/preview?groupId={}'
 
-
-preview_url = "https://www.mturk.com/mturk/preview?groupId={}"
-if args.sandbox:
-    preview_url = "https://workersandbox.mturk.com/mturk/preview?groupId={}"
-
-for hittypeid in set((x['HITTypeId'] for x in hit_list)):
-    print("You can preview your new HIT at:\n\t{}".format(preview_url.format(hittypeid)))
-    print("{0} is the final balance".format(mtc.get_account_balance()))
+for hittypeid in {x['HITTypeId'] for x in hit_list}:
+    print('You can preview your new HIT at:\n\t{}'.format(preview_url.format(hittypeid)))
+    print('{0} is the final balance'.format(mtc.get_account_balance()))
