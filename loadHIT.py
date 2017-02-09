@@ -32,7 +32,7 @@ from __future__ import print_function
 import argparse
 from datetime import timedelta
 
-from boto.mturk.connection import MTurkConnection
+from boto.mturk.connection import MTurkConnection, MTurkRequestError
 from boto.mturk.price import Price
 
 from boto.mturk.qualification import (AdultRequirement,
@@ -90,21 +90,22 @@ questions = [ExternalQuestion(url, hitdata['question']['height']) for url in qur
 
 quals = Qualifications()
 
-for b in hitdata['qualifications']['builtin']:
-    if b['qualification'] == 'AdultRequirement':
-        assert b['value'] in (0, 1), 'value must be 0 or 1, not {}'.format(b['value'])
-        q = AdultRequirement(b['comparator'], b['value'], b['private'])
-    elif b['qualification'] == 'LocaleRequirement':
-        q = LocaleRequirement(b['comparator'], b['locale'], b['private'])
-    else:
-        q = {'NumberHitsApprovedRequirement': NumberHitsApprovedRequirement,
-             'PercentAssignmentsAbandonedRequirement': PercentAssignmentsAbandonedRequirement,
-             'PercentAssignmentsApprovedRequirement': PercentAssignmentsApprovedRequirement,
-             'PercentAssignmentsRejectedRequirement': PercentAssignmentsRejectedRequirement,
-             'PercentAssignmentsReturnedRequirement': PercentAssignmentsReturnedRequirement,
-             'PercentAssignmentsSubmittedRequirement': PercentAssignmentsSubmittedRequirement
-             }[b['qualification']](b['comparator'], b['value'], b['private'])
-    quals.add(q)
+if 'builtin' in hitdata['qualifications']:
+    for b in hitdata['qualifications']['builtin']:
+        if b['qualification'] == 'AdultRequirement':
+            assert b['value'] in (0, 1), 'value must be 0 or 1, not {}'.format(b['value'])
+            q = AdultRequirement(b['comparator'], b['value'], b['private'])
+        elif b['qualification'] == 'LocaleRequirement':
+            q = LocaleRequirement(b['comparator'], b['locale'], b['private'])
+        else:
+            q = {'NumberHitsApprovedRequirement': NumberHitsApprovedRequirement,
+                 'PercentAssignmentsAbandonedRequirement': PercentAssignmentsAbandonedRequirement,
+                 'PercentAssignmentsApprovedRequirement': PercentAssignmentsApprovedRequirement,
+                 'PercentAssignmentsRejectedRequirement': PercentAssignmentsRejectedRequirement,
+                 'PercentAssignmentsReturnedRequirement': PercentAssignmentsReturnedRequirement,
+                 'PercentAssignmentsSubmittedRequirement': PercentAssignmentsSubmittedRequirement
+                 }[b['qualification']](b['comparator'], b['value'], b['private'])
+        quals.add(q)
 
 if 'custom' in hitdata['qualifications']:
     for c in hitdata['qualifications']['custom']:
@@ -130,21 +131,23 @@ approvaldelay = timedelta(days=14)
 if 'autoapprovaldelay' in hitdata:
     approvaldelay = timedelta(seconds=hitdata['autoapprovaldelay'])
 
-# XXX: I think this is just old code that assumes one question. Can it be removed?
-# created_hits = [(q, hitdata['assignments'],hitdata['title'], hitdata['description'], hitdata['keywords'])]
-
 # FIXME: if mtc.create_hit fails partway through a list of HITs to create, they all get lost
-created_hits = [mtc.create_hit(question=q,
-                               max_assignments=hitdata['assignments'],
-                               title=hitdata['title'],
-                               description=hitdata['description'],
-                               keywords=hitdata['keywords'],
-                               duration=duration,
-                               lifetime=lifetime,
-                               approval_delay=approvaldelay,
-                               reward=reward,
-                               qualifications=quals)
-                for q in questions]
+created_hits = []
+for q in questions:
+    try:
+        hit = mtc.create_hit(question=q,
+                             max_assignments=hitdata['assignments'],
+                             title=hitdata['title'],
+                             description=hitdata['description'],
+                             keywords=hitdata['keywords'],
+                             duration=duration,
+                             lifetime=lifetime,
+                             approval_delay=approvaldelay,
+                             reward=reward,
+                             qualifications=quals)
+        created_hits.append(hit)
+    except MTurkRequestError as e:
+        print('{}: {}\n{}'.format(e.status, e.reason, e.body))
 
 hit_list = [{'HITId': y.HITId, 'HITTypeId': y.HITTypeId} for y in [x[0] for x in created_hits]]
 
