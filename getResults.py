@@ -25,28 +25,25 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
 
-__author__ = 'Andrew Watts <awatts@bcs.rochester.edu>'
-
-from math import ceil
 import argparse
-import sys
 from csv import DictWriter
-from boto.mturk.connection import MTurkConnection
-from boto import config
+from math import ceil
 
+from boto.mturk.connection import MTurkConnection
 from yaml import load
+
 try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
 
-mturk_website = 'requester.mturk.com'
+__author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
 
-def manage_url(hit):
+def manage_url(hit, mturk_website):
     return 'https://{}/mturk/manageHIT?HITId={}'.format(
         mturk_website, hit.HITId)
 
@@ -55,6 +52,8 @@ def manage_url(hit):
 # r0.AcceptTime        r0.AssignmentId      r0.HITId             r0.answers
 # r0.ApprovalTime      r0.AssignmentStatus  r0.SubmitTime
 # r0.Assignment        r0.AutoApprovalTime  r0.WorkerId
+
+
 def process_assignments(page, allresults, hitinfo):
     """
     Take one page of ResultSets and add them to the results.
@@ -93,7 +92,7 @@ def process_assignments(page, allresults, hitinfo):
         try:
             hit = hitinfo[row['hitid']]
         except KeyError as e:
-            print('KeyError: {}'.format(e.message))
+            print('KeyError: {}'.format(e.args))
             continue
         row['hittypeid'] = hit.HITTypeId
         row['title'] = hit.Title
@@ -114,7 +113,7 @@ def process_assignments(page, allresults, hitinfo):
         row['assignmentduration'] = hit.AssignmentDurationInSeconds
         row['autoapprovaldelay'] = hit.AutoApprovalDelayInSeconds
         row['hitlifetime'] = hit.Expiration
-        row['viewhit'] = manage_url(hit)
+        row['viewhit'] = manage_url(hit, mturk_website)
 
         for a in assignment.answers:
             for q in a:
@@ -129,19 +128,16 @@ parser.add_argument('-r', '--resultsfile', required=True, help='Filename for tab
 parser.add_argument('-s', '--sandbox', action='store_true',
                     help='Run the command in the Mechanical Turk Sandbox (used for testing purposes)')
 parser.add_argument('-p', '--profile',
-        help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
+                    help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
-if args.sandbox:
-    if not config.has_section('MTurk'):
-        config.add_section('MTurk')
-    config.set('MTurk', 'sandbox', 'True')
-    mturk_website = 'requestersandbox.mturk.com'
+host = 'mechanicalturk.sandbox.amazonaws.com' if args.sandbox else 'mechanicalturk.amazonaws.com'
+mturk_website = 'requestersandbox.mturk.com' if args.sandbox else 'requester.mturk.com'
 
 with open(args.successfile, 'r') as successfile:
     hitdata = load(successfile, Loader=Loader)
 
-mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
+mtc = MTurkConnection(is_secure=True, host=host, profile_name=args.profile)
 
 all_results = []
 outkeys = ['hitid', 'hittypeid', 'title', 'description', 'keywords', 'reward',

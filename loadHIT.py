@@ -29,10 +29,10 @@ from __future__ import print_function
 
 import argparse
 from datetime import timedelta
+
+from boto import config
 from boto.mturk.connection import MTurkConnection
 from boto.mturk.price import Price
-from boto.mturk.question import ExternalQuestion
-from boto import config
 from boto.mturk.qualification import (Requirement,
                                       NumberHitsApprovedRequirement,
                                       PercentAssignmentsApprovedRequirement,
@@ -43,7 +43,7 @@ from boto.mturk.qualification import (Requirement,
                                       LocaleRequirement,
                                       AdultRequirement,
                                       Qualifications)
-
+from boto.mturk.question import ExternalQuestion
 from yaml import load, safe_dump
 try:
     from yaml import CLoader as Loader
@@ -86,7 +86,7 @@ if 'input' in hitdata['question']:
     qurls = [hitdata['question']['url'].format(**row) for row in hitdata['question']['input']]
 else:
      qurls = [hitdata['question']['url']]
- 
+
 questions = [ExternalQuestion(url, hitdata['question']['height']) for url in qurls]
 
 quals = Qualifications()
@@ -130,28 +130,25 @@ approvaldelay = timedelta(days=14)
 if 'autoapprovaldelay' in hitdata:
     approvaldelay = timedelta(seconds=hitdata['autoapprovaldelay'])
 
-created_hits = [(q, hitdata['assignments'],hitdata['title'], hitdata['description'], hitdata['keywords'])]
 created_hits = [mtc.create_hit(question=q,
-                              max_assignments=hitdata['assignments'],
-                              title=hitdata['title'],
-                              description=hitdata['description'],
-                              keywords=hitdata['keywords'],
-                              duration=duration,
-                              lifetime=lifetime,
-                              approval_delay=approvaldelay,
-                              reward=reward,
-                              qualifications=quals)
-                 for q in questions]
-     
-hit_list = [dict((('HITId', y.HITId), ('HITTypeId', y.HITTypeId))) for y in [x[0] for x in created_hits]]
+                               max_assignments=hitdata['assignments'],
+                               title=hitdata['title'],
+                               description=hitdata['description'],
+                               keywords=hitdata['keywords'],
+                               duration=duration,
+                               lifetime=lifetime,
+                               approval_delay=approvaldelay,
+                               reward=reward,
+                               qualifications=quals)
+                for q in questions]
+
+hit_list = [{'HITId': y.HITId, 'HITTypeId': y.HITTypeId} for y in [x[0] for x in created_hits]]
 
 outfilename = hitfile_name.split('.')
 outfilename.insert(-1, 'success')
 outfilename = '.'.join(outfilename)
 with open(outfilename, 'w') as successfile:
     safe_dump(hit_list, stream=successfile, default_flow_style=False)
-
-
 
 preview_url = "https://www.mturk.com/mturk/preview?groupId={}"
 if args.sandbox:

@@ -25,10 +25,10 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
 
-__author__ = 'Andrew Watts <awatts@bcs.rochester.edu>'
+__author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
 import argparse
 from csv import DictReader
