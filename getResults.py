@@ -29,7 +29,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-from csv import DictWriter
+from unicodecsv import DictWriter
 from math import ceil
 
 from boto.mturk.connection import MTurkConnection
