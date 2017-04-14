@@ -18,7 +18,7 @@ setup(name='mturkutils',
       install_requires=[
           'boto',
           'unicodecsv',
-          'PyYAML',
+          'ruamel.yaml',
           'six',
       ],
       include_package_data=True,

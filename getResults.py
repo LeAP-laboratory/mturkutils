@@ -28,12 +28,7 @@ from unicodecsv import DictWriter
 from math import ceil
 
 from boto.mturk.connection import MTurkConnection
-from yaml import load
-
-try:
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Loader
+from ruamel.yaml import load
 
 __author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
@@ -130,7 +125,7 @@ host = 'mechanicalturk.sandbox.amazonaws.com' if args.sandbox else 'mechanicaltu
 mturk_website = 'requestersandbox.mturk.com' if args.sandbox else 'requester.mturk.com'
 
 with open(args.successfile, 'r') as successfile:
-    hitdata = load(successfile, Loader=Loader)
+    hitdata = load(successfile)
 
 mtc = MTurkConnection(is_secure=True, host=host, profile_name=args.profile)
 

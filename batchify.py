@@ -22,12 +22,7 @@
 from __future__ import print_function
 
 import argparse
-from yaml import load, safe_dump
-try:
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Loader
-
+from ruamel.yaml import load, safe_dump
 
 parser = argparse.ArgumentParser(description='Convert a .yml config file with many assignments into a collection of smaller batches')
 parser.add_argument('-c', '--config', required=True, help='YAML file with HIT configuration')
@@ -37,7 +32,7 @@ args = parser.parse_args()
 
 with open(args.config, 'r') as configfile:
     configfilename = configfile.name
-    configdata = load(configfile, Loader=Loader)
+    configdata = load(configfile)
 
 assignments_to_go = configdata['assignments']
 
@@ -57,4 +52,4 @@ while assignments_to_go > 0:
     batch_i += 1
     with open(batch_fn.format(batch_i), 'w') as batchconfig:
         print("  Batch {}: {} ({} assignemnts)".format(batch_i, batchconfig.name, n))
-        safe_dump(configdata, stream = batchconfig, default_flow_style=False)
+        safe_dump(configdata, stream=batchconfig, default_flow_style=False)
