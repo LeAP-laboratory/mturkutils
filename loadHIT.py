@@ -42,7 +42,7 @@ from boto.mturk.qualification import (AdultRequirement,
                                       Requirement)
 from boto.mturk.question import ExternalQuestion
 
-from ruamel.yaml import load, safe_dump
+from ruamel.yaml import load, safe_dump, CLoader
 
 __author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
@@ -57,7 +57,7 @@ args = parser.parse_args()
 
 with open(args.config, 'r') as hitfile:
     hitfile_name = hitfile.name
-    hitdata = load(hitfile)
+    hitdata = load(hitfile, loader=CLoader)
 
 required_keys = ('description', 'title', 'assignments', 'keywords', 'reward', 'question')
 

@@ -22,7 +22,7 @@
 from __future__ import print_function
 
 import argparse
-from ruamel.yaml import load, safe_dump
+from ruamel.yaml import load, safe_dump, CLoader
 
 parser = argparse.ArgumentParser(description='Convert a .yml config file with many assignments into a collection of smaller batches')
 parser.add_argument('-c', '--config', required=True, help='YAML file with HIT configuration')
@@ -32,7 +32,7 @@ args = parser.parse_args()
 
 with open(args.config, 'r') as configfile:
     configfilename = configfile.name
-    configdata = load(configfile)
+    configdata = load(configfile, loader=CLoader)
 
 assignments_to_go = configdata['assignments']
 
