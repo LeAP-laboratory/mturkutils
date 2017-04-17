@@ -125,7 +125,7 @@ host = 'mechanicalturk.sandbox.amazonaws.com' if args.sandbox else 'mechanicaltu
 mturk_website = 'requestersandbox.mturk.com' if args.sandbox else 'requester.mturk.com'
 
 with open(args.successfile, 'r') as successfile:
-    hitdata = load(successfile, loader=CLoader)
+    hitdata = load(successfile, Loader=CLoader)
 
 mtc = MTurkConnection(is_secure=True, host=host, profile_name=args.profile)
 

@@ -17,9 +17,11 @@ setup(name='mturkutils',
       packages=['mturkutils',],
       install_requires=[
           'boto',
+          'boto3',
           'unicodecsv',
           'ruamel.yaml',
           'six',
+          'xmltodict',
       ],
       include_package_data=True,
       zip_safe=False)

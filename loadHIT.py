@@ -57,7 +57,7 @@ args = parser.parse_args()
 
 with open(args.config, 'r') as hitfile:
     hitfile_name = hitfile.name
-    hitdata = load(hitfile, loader=CLoader)
+    hitdata = load(hitfile, Loader=CLoader)
 
 required_keys = ('description', 'title', 'assignments', 'keywords', 'reward', 'question')
 

@@ -32,7 +32,7 @@ args = parser.parse_args()
 
 with open(args.config, 'r') as configfile:
     configfilename = configfile.name
-    configdata = load(configfile, loader=CLoader)
+    configdata = load(configfile, Loader=CLoader)
 
 assignments_to_go = configdata['assignments']
 
