@@ -22,6 +22,8 @@
 
 import argparse
 
+from typing import Dict, Tuple, Set
+
 import boto3
 
 from ruamel.yaml import load, CLoader
@@ -33,24 +35,25 @@ import xmltodict
 __author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
 
-def manage_url(hitid: str, mturk_website: str) -> str:
+def manage_url(hitid: str, sandbox: bool=False) -> str:
+    mturk_website = 'requestersandbox.mturk.com' if sandbox else 'requester.mturk.com'
     return 'https://{}/mturk/manageHIT?HITId={}'.format(
         mturk_website, hitid)
 
 
-def process_assignment(assignment: dict, hitinfo: dict) -> dict:
+def process_assignment(assignment: dict, hitinfo: dict, sandbox: bool=False) -> Tuple[Dict[str, str], Set]:
     """Turn an Assignment dict as returned by boto3 into a row for results file."""
     optional_assignment_keys = {
         'AcceptTime': 'assignmentaccepttime', 'RejectTime': 'assignmentrejecttime', 'Deadline': 'deadline',
         'RequesterFeedback': 'feedback', 'ApprovalTime': 'assignmentapprovaltime'
     }
     print(f'Processing AssignmentId: {assignment["AssignmentId"]} for Worker: {assignment["WorkerId"]}')
-    row = {
+    row: Dict[str, str] = {
         'assignmentid': assignment['AssignmentId'],
         'assignmentstatus': assignment['AssignmentStatus'],
         'autoapprovaltime': assignment['AutoApprovalTime'],
         'hitid': assignment['HITId'],
-        'viewhit': manage_url(assignment['HITId'], mturk_website),  # FIXME: use of global `mturk_website` impure!
+        'viewhit': manage_url(assignment['HITId'], sandbox),
         'assignmentsubmittime': assignment['SubmitTime'],
         'workerid': assignment['WorkerId'],
         # these assignment keys are optional
@@ -86,11 +89,12 @@ def process_assignment(assignment: dict, hitinfo: dict) -> dict:
         if k in assignment:
             row[v] = assignment[k]
 
+    assignment_keys = set()
     if 'QualificationRequirements' in hitinfo:
         for i, qual in enumerate(['|'.join(['{}:{}'.format(k, v) for k, v in x.items()]) for x in hitinfo['QualificationRequirements']]):
             qualkey = 'Qualification.{}'.format(i)
             row[qualkey] = qual
-            answer_keys.add(qualkey)  # FIXME: more functional impurity!
+            assignment_keys.add(qualkey)
 
     if 'RequesterAnnotation' in hitinfo:
         row['annotation'] = hitinfo['RequesterAnnotation']
@@ -101,10 +105,10 @@ def process_assignment(assignment: dict, hitinfo: dict) -> dict:
     # http://docs.aws.amazon.com/AWSMechTurk/latest/AWSMturkAPI/ApiReference_QuestionFormAnswersDataStructureArticle.html
     # http://mechanicalturk.amazonaws.com/AWSMechanicalTurkDataSchemas/2005-10-01/QuestionFormAnswers.xsd
     user_answers = {'Answer.{}'.format(d['QuestionIdentifier']): d['FreeText'] for d in ordered_answers}
-    answer_keys.update(set(user_answers.keys()))  # FIXME: more functional impurity!
+    assignment_keys.update(set(user_answers.keys()))
     row.update(user_answers)
 
-    return row
+    return row, assignment_keys
 
 
 parser = argparse.ArgumentParser(description='Get results from Amazon Mechanical Turk')
@@ -117,7 +121,6 @@ parser.add_argument('-p', '--profile',
 args = parser.parse_args()
 
 endpoint = 'https://mturk-requester-sandbox.us-east-1.amazonaws.com' if args.sandbox else 'https://mturk-requester.us-east-1.amazonaws.com'
-mturk_website = 'requestersandbox.mturk.com' if args.sandbox else 'requester.mturk.com'
 
 with open(args.successfile, 'r') as successfile:
     hitdata = load(successfile, Loader=CLoader)
@@ -138,7 +141,6 @@ outkeys = ['hitid', 'hittypeid', 'hitgroupid', 'title', 'description', 'keywords
            'deadline', 'feedback', 'reject']
 answer_keys = set()
 
-
 hits = {h['HITId']: mtc.get_hit(HITId=h['HITId']).get('HIT') for h in hitdata}
 
 print('Processing results')
@@ -150,7 +152,9 @@ for h in hitdata:
         response = mtc.list_assignments_for_hit(HITId=h['HITId'], NextToken=response.get('NextToken'))
         assignments.extend(response.get('Assignments'))
     for assignment in assignments:
-        all_results.append(process_assignment(assignment, hits[h["HITId"]]))
+        row, assignment_keys = process_assignment(assignment, hits[h['HITId']], args.sandbox)
+        all_results.append(row)
+        answer_keys.update(assignment_keys)
 
 outkeys.extend(list(sorted(answer_keys)))
 
