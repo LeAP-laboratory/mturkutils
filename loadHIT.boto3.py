@@ -29,6 +29,8 @@ from typing import Dict, List, Tuple, Union
 
 import boto3
 
+from botocore.exceptions import ClientError
+
 from ruamel.yaml import load, safe_dump, CLoader
 
 from xmltodict import unparse
@@ -94,6 +96,8 @@ parser = argparse.ArgumentParser(description='Load a HIT into Amazon Mechanical 
 parser.add_argument('-c', '--config', required=True, help='YAML file with HIT configuration')
 parser.add_argument('-s', '--sandbox', action='store_true',
                     help='Run the command in the Mechanical Turk Sandbox (used for testing purposes)')
+parser.add_argument('-q', '--sqsqueue',
+                    help='Name of SQS Queue to receive notifications about HIT actions at')
 parser.add_argument('-p', '--profile', help='Run commands using specific aws credentials rather the default.'
                                             'To set-up alternative credentials see '
                                             'http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
@@ -184,20 +188,23 @@ if 'autoapprovaldelay' in hitdata:
 
 created_hits = []
 for q in questions:
-    hit = mtc.create_hit(
-        MaxAssignments=hitdata['assignments'],
-        AutoApprovalDelayInSeconds=int(approvaldelay),
-        LifetimeInSeconds=int(lifetime),
-        AssignmentDurationInSeconds=int(duration),
-        Reward=f"{hitdata['reward']:.2f}",
-        Title=hitdata['title'],
-        Keywords=format_keywords(hitdata['keywords']),
-        Description=hitdata['description'],
-        Question=q,
-        RequesterAnnotation='',  # FIXME: get annotation if exists
-        QualificationRequirements=qualifications
-    )
-    created_hits.append(hit.get('HIT', {}))
+    try:
+        hit = mtc.create_hit(
+            MaxAssignments=hitdata['assignments'],
+            AutoApprovalDelayInSeconds=int(approvaldelay),
+            LifetimeInSeconds=int(lifetime),
+            AssignmentDurationInSeconds=int(duration),
+            Reward=f"{hitdata['reward']:.2f}",
+            Title=hitdata['title'],
+            Keywords=format_keywords(hitdata['keywords']),
+            Description=hitdata['description'],
+            Question=q,
+            RequesterAnnotation='',  # FIXME: get annotation if exists
+            QualificationRequirements=qualifications
+        )
+        created_hits.append(hit.get('HIT', {}))
+    except ClientError as e:
+        print(e)
 
 pprint(created_hits)
 
@@ -209,7 +216,32 @@ outfilename = '.'.join(outfilename)
 with open(outfilename, 'w') as successfile:
     safe_dump(hit_list, stream=successfile, default_flow_style=False)
 
-# TODO: integrate SQS notification stuff into here.
+if args.sqsqueue:
+    sqs = boto3.resource('sqs')
+    try:
+        queue = sqs.get_queue_by_name(QueueName=args.sqsqueue)
+    except ClientError as e:
+        queue = None
+        print(e)
+    if queue:
+        for hit in hit_list:
+            try:
+                sqs_response = mtc.update_notification_settings(
+                    HITTypeId=hit['HITTypeId'],
+                    Notification={
+                        'Destination': queue.url,
+                        'Transport': 'SQS',
+                        'Version': '2006-05-05',
+                        'EventTypes': [
+                            'AssignmentAccepted', 'AssignmentSubmitted', 'AssignmentReturned', 'AssignmentAbandoned',
+                            'HITReviewable', 'HITExpired'
+                        ]
+                    },
+                    Active=True
+                )
+                print(f'Sending notifications for {hit["HITTypeId"]} to {queue.url}')
+            except ClientError as e:
+                print(e)
 
 preview_url = 'https://workersandbox.mturk.com/mturk/preview?groupId={}' if args.sandbox else 'https://www.mturk.com/mturk/preview?groupId={}'
 
