@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright (c) 2012-2017 Andrew Watts and the University of Rochester BCS Department
 #
@@ -20,15 +20,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from __future__ import division
-from __future__ import print_function
-
 __author__ = 'Andrew Watts <awatts2@ur.rochester.edu>'
 
 import argparse
+
 from csv import DictReader
-from boto.mturk.connection import MTurkConnection, MTurkRequestError
-from boto import config
+
+import boto3
+
+from botocore.exceptions import ClientError
 
 parser = argparse.ArgumentParser(description='Assign a qualification to Amazon Mechanical Turk workers')
 parser.add_argument('-q', '--qualification', required=True, help='Qualification ID')
@@ -39,20 +39,26 @@ parser.add_argument('-p', '--profile',
         help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
-if args.sandbox:
-    if not config.has_section('MTurk'):
-        config.add_section('MTurk')
-    config.set('MTurk', 'sandbox', 'True')
-    mturk_website = 'requestersandbox.mturk.com'
+# Only region w/ MTurk endpoint currently is us-east-1
+region = 'us-east-1'
+endpoint = f'https://mturk-requester-sandbox.{region}.amazonaws.com' if args.sandbox else f'https://mturk-requester.{region}.amazonaws.com'
+# If you want to use profiles, you have to create a Session with one before connecting a client
+session = boto3.Session(profile_name=args.profile)
 
 with open(args.resultsfile, 'r') as infile:
     results = list(DictReader(infile, delimiter='\t'))
 
-mtc = MTurkConnection(is_secure=True, profile_name=args.profile)
+mtc = session.client('mturk', endpoint_url=endpoint, region_name=region)
 
 for row in results:
     try:
-        mtc.assign_qualification(args.qualification, row['workerid'], value=1, send_notification=False)
+        mtc.associate_qualification_with_worker(
+            QualificationTypeId=args.qualification,
+            WorkerId=row['workerid'],
+            IntegerValue=1,
+            SendNotification=False
+        )
         print("Assigning {} to {}".format(args.qualification, row['workerid']))
-    except MTurkRequestError as e:
+    except ClientError as e:
+        print(e)
         print("Skipping {} for {}".format(args.qualification, row['workerid']))
