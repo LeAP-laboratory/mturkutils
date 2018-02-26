@@ -90,4 +90,6 @@ hit_keys = {'HITTypeId', 'HITGroupId', 'HITId', 'HITStatus', 'HITReviewStatus',
 hit_df = pd.DataFrame([{k: h[k] for k in h.keys() & hit_keys} for h in all_hits])
 hit_df['Question'] = hit_df['Question'].apply(extract_hit_url)
 hit_df['QualificationRequirements'] = hit_df['QualificationRequirements'].apply(dump)
-hit_df.to_csv('all_hits-{}.csv'.format(datetime.now().isoformat()), index=False, columns=hit_keys)
+outfile_name = 'all_hits-{}.csv'.format(datetime.now().isoformat())
+print(f'Writing out "{outfile_name}"')
+hit_df.to_csv(outfile_name, index=False, columns=hit_keys)
