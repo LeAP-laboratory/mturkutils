@@ -45,7 +45,10 @@ def extract_hit_url(row):
     """
     try:
         row_dict = parse_xml(row)
-        return row_dict['ExternalQuestion']['ExternalURL']
+        if 'ExternalQuestion' in row_dict.keys():
+            return row_dict['ExternalQuestion']['ExternalURL']
+        elif 'HTMLQuestion' in row_dict.keys():
+            return row_dict['HTMLQuestion']['HTMLContent']
     except KeyError:
         return row
 
