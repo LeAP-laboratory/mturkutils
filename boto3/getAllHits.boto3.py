@@ -49,6 +49,8 @@ def extract_hit_url(row):
             return row_dict['ExternalQuestion']['ExternalURL']
         elif 'HTMLQuestion' in row_dict.keys():
             return row_dict['HTMLQuestion']['HTMLContent']
+        else:
+            return row
     except KeyError:
         return row
 
