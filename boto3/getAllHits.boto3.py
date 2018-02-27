@@ -23,6 +23,7 @@
 
 
 import argparse
+from collections import Counter
 from datetime import datetime
 
 import boto3
@@ -67,29 +68,31 @@ mtc = session.client('mturk', endpoint_url=endpoint, region_name=region)
 
 try:
     all_hits = []
-    hit_batch = mtc.list_hits()
-    num_results = hit_batch['NumResults']
-    next_token = hit_batch['NextToken']
-    all_hits.extend(hit_batch['HITs'])
+    num_results = 10  # fake number of results so loop executes at least once
+    next_token = None
     while num_results >= 10:  # 10 is the max you get at once
-        hit_batch = mtc.list_hits(NextToken=next_token)
-        # FIXME: I don't like that this duplicates the code before the loop
+        hit_batch = mtc.list_hits(NextToken=next_token) if next_token else mtc.list_hits()
         num_results = hit_batch['NumResults']
         next_token = hit_batch['NextToken']
         all_hits.extend(hit_batch['HITs'])
 except ClientError as e:
     print(e)
 
-hit_keys = {'HITTypeId', 'HITGroupId', 'HITId', 'HITStatus', 'HITReviewStatus',
+hit_keys = ('HITTypeId', 'HITGroupId', 'HITId', 'HITStatus', 'HITReviewStatus',
             'Title', 'Question', 'Description', 'Keywords', 'Reward',
             'CreationTime', 'AutoApprovalDelayInSeconds', 'AssignmentDurationInSeconds',
             'Expiration', 'NumberOfAssignmentsAvailable',
             'NumberOfAssignmentsCompleted', 'NumberOfAssignmentsPending',
-            'MaxAssignments', 'QualificationRequirements'}
+            'MaxAssignments', 'QualificationRequirements')
 
-hit_df = pd.DataFrame([{k: h[k] for k in h.keys() & hit_keys} for h in all_hits])
+hit_df = pd.DataFrame([{k: h[k] for k in h.keys() & set(hit_keys)} for h in all_hits])
 hit_df['Question'] = hit_df['Question'].apply(extract_hit_url)
 hit_df['QualificationRequirements'] = hit_df['QualificationRequirements'].apply(dump)
+
+print(f'{len(all_hits)} current HITs')
+for k, v in Counter([h['HITStatus'] for h in all_hits]).items():
+    print(f'{k}: {v}')
+
 outfile_name = 'all_hits-{}.csv'.format(datetime.now().isoformat())
 print(f'Writing out "{outfile_name}"')
 hit_df.to_csv(outfile_name, index=False, columns=hit_keys)
