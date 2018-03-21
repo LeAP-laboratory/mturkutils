@@ -102,12 +102,19 @@ def process_assignment(assignment: dict, hitinfo: dict, sandbox: bool=False) -> 
     # answers are in assignment['Answer'] as an MTurk QuestionFormAnswers XML string
     ordered_answers = xmltodict.parse(assignment.get('Answer')).get('QuestionFormAnswers').get('Answer')
     # FIXME: answer might not be FreeText, but that's what I'm handling for now
+    # Other possibilities are:
+    #    sequence of "SelectionIdentifier" and/or "OtherSelectionText"
+    #    sequence of "UploadedFileSizeInBytes" and "UploadedFileKey"
     # http://docs.aws.amazon.com/AWSMechTurk/latest/AWSMturkAPI/ApiReference_QuestionFormAnswersDataStructureArticle.html
     # http://mechanicalturk.amazonaws.com/AWSMechanicalTurkDataSchemas/2005-10-01/QuestionFormAnswers.xsd
-    user_answers = {'Answer.{}'.format(d['QuestionIdentifier']): d['FreeText'] for d in ordered_answers}
+
+    # Sometimes you get a list or OrderedDicts, sometimes a single OrderedDict
+    if issubclass(ordered_answers.__class__, dict):
+        user_answers = {f"Answer.{ordered_answers['QuestionIdentifier']}": ordered_answers['FreeText']}
+    else:
+        user_answers = {f"Answer.{d['QuestionIdentifier']}": d['FreeText'] for d in ordered_answers}
     assignment_keys.update(set(user_answers.keys()))
     row.update(user_answers)
-
     return row, assignment_keys
 
 
@@ -120,7 +127,9 @@ parser.add_argument('-p', '--profile',
                     help='Run commands using specific aws credentials rather the default. To set-up alternative credentials see http://boto3.readthedocs.org/en/latest/guide/configuration.html#shared-credentials-file')
 args = parser.parse_args()
 
-endpoint = 'https://mturk-requester-sandbox.us-east-1.amazonaws.com' if args.sandbox else 'https://mturk-requester.us-east-1.amazonaws.com'
+# Only region w/ MTurk endpoint currently is us-east-1
+region = 'us-east-1'
+endpoint = f'https://mturk-requester-sandbox.{region}.amazonaws.com' if args.sandbox else f'https://mturk-requester.{region}.amazonaws.com'
 
 with open(args.successfile, 'r') as successfile:
     hitdata = load(successfile, Loader=CLoader)
@@ -128,8 +137,7 @@ print('Loaded successfile')
 
 # If you want to use profiles, you have to create a Session with one before connecting a client
 session = boto3.Session(profile_name=args.profile)
-# Only region w/ MTurk endpoint currently is us-east-1
-mtc = session.client('mturk', endpoint_url=endpoint, region_name='us-east-1')
+mtc = session.client('mturk', endpoint_url=endpoint, region_name=region)
 
 all_results = []
 outkeys = ['hitid', 'hittypeid', 'hitgroupid', 'title', 'description', 'keywords', 'reward',
