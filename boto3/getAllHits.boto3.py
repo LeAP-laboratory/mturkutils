@@ -32,7 +32,7 @@ from botocore.exceptions import ClientError
 
 import pandas as pd
 
-from ruamel_yaml import dump
+from ruamel.yaml import dump
 
 from xmltodict import parse as parse_xml
 
@@ -40,7 +40,7 @@ from xmltodict import parse as parse_xml
 def extract_hit_url(row):
     """
     Extract the external question URL from XML encoded Question.
-    
+
     If not an ExternalQuestion, fail and return original data
     """
     try:
